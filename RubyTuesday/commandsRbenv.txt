@@ -1,0 +1,21 @@
+how to use this for a server???
+
+git clone https://github.com/sstephenson/rbenv.git ~/.rbenv
+echo 'export PATH="$HOME/.rbenv/bin:$PATH"' >> ~/.bash_profile
+echo 'eval "$(rbenv init -)"' >> ~/.bash_profile
+
+#for testing
+type rbenv 
+
+#ruby-build
+git clone https://github.com/sstephenson/ruby-build.git ~/.rbenv/plugins/ruby-build
+
+#Deploying ->
+https://github.com/sstephenson/rbenv/wiki/Deploying-with-rbenv
+
+requirements:
+
+sudo apt-get install git-core curl zlib1g-dev build-essential libssl-dev libreadline-dev libyaml-dev libsqlite3-dev sqlite3 libxml2-dev libxslt1-dev libcurl4-openssl-dev python-software-properties
+
+apt-get install autoconf bison build-essential libssl-dev libyaml-dev libreadline6-dev zlib1g-dev libncurses5-dev
+

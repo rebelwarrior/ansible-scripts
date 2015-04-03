@@ -1,0 +1,24 @@
+---
+pre_tasks:
+- name: Update apt cache
+  apt: update_cache=yes cache_valid_time=3600  
+  
+tasks:
+- name: Install OpenJDK 7
+  apt: "pkg={{ item }} state=latest update_cache=yes"
+  with_items:
+    - openjdk-7-jdk
+    
+- name: Set OpenJDK as stable
+  command: update-java-alternatives --set {{ item }}
+  with_items:
+    - openjdk-7-jdk
+
+- name: Install Tomcat 7 (TomServo)
+  apt: "pkg={{ item }} state=installed"
+  with_items:
+    - tomcat7
+    - tomcat7-admin
+    
+- name: Ensure Tomcat 7 is started and enabled on boot
+  service: name=tomcat7 state=started enabled=yes

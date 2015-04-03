@@ -1,0 +1,161 @@
+---
+- hosts: all
+  pre_tasks:
+  - name: Update apt cache
+    apt: update_cache=yes cache_valid_time=3600
+    sudo: yes
+
+  - name: quote InfoSec Taylor Swift:
+    debug: >
+      msg="There is no love without vulnerability. That's why it's not allowed on our network."
+
+  tasks:
+  - name: Turn off Remote Root Login
+    lineinfile: >
+      dest="/etc/ssh/sshd_config"
+      regexp="^(PermitRootLogin*)"
+      line='PermitRootLogin no'
+      backrefs=yes
+      state=present
+      owner=root
+      group=root
+      mode=0644
+      create=no
+      backup=yes
+    sudo: yes
+
+  - name: Install ufw (Uncomplicated Firewall)
+    apt: >
+      pkg={{ item }} state=present update_cache=no
+    sudo: yes
+    with_items:
+      - ufw
+
+  - name: Register Firewall Status
+    shell: ufw status
+    register: ufw_status
+    sudo: yes
+    changed_when: false
+    # Status: inactive
+
+  - name: Secure ssh with limit (before closing all ports)
+    ufw: rule=limit port={{ item }}
+    with_items:
+      - '22'
+      - '2222'
+    sudo: yes
+
+  # Skipping adding existing rule
+  # Rules updated\nRules updated
+
+  - name: Close all other ports
+    shell: ufw default deny
+    register: closing_all_ports
+    sudo: yes
+
+  - name: Create exception for IP for local network txt
+    shell: ufw allow from 127.0.0.1 to any
+    sudo: yes
+
+  - name: Enable Firewall (ufw)
+    ufw: state=enabled
+    sudo: yes
+
+  # - name: Assert ports are close by default
+  #   assert:
+  #     that: closing_all_ports.stdout == "Default incoming policy changed to 'deny'"
+
+  - name: Create exception for IP for local network txt
+    shell: ufw allow from 127.0.0.1 to any
+    sudo: yes
+    when: false
+
+  - name: Create exception for IP for local network for mysql port (3306)
+    shell: ufw allow from {{ item }} to any port 3306
+    with_items:
+      - '127.0.0.1'
+    when: false
+
+
+  # - name: Deny services
+  #   shell: ufw deny {{ item }}
+  #   sudo: yes
+  #   with_items:
+  #     - service_name
+
+  # - name: Allow services
+  #   shell: ufw allow {{ item }}
+  #   sudo: yes
+  #   with_items:
+  #     - service_name
+
+###https://help.ubuntu.com/community/UFW
+###http://guides.webbynode.com/articles/security/ubuntu-ufw.html
+
+  - name: Install {{ item }}
+    apt: >
+      pkg={{ item }} state=present update_cache=no
+    sudo: yes
+    with_items:
+      - fail2ban
+
+  - name: Copy Default config for Fail2Ban
+    shell: cp /etc/fail2ban/jail.conf /etc/fail2ban/jail.local
+    sudo: yes
+
+  - name: Start Fail2ban server via client
+    shell: fail2ban-client start
+    sudo: yes
+    ignore_errors: yes
+
+###
+
+#   - name: Install Unattended upgrades
+#     apt: >
+#       pkg={{ item }} state=installed update_cache=no
+#     sudo: yes
+#     with_items:
+#       - unattennded-upgrades
+#
+#   - name: Copy unattended-upgrades config
+#     template:
+#       src: "{{ item }}.j2"
+#       dest: "/etc/apt/apt.conf.d/{{ item }}"
+#       owner: root
+#       group: root
+#       mode: 0644
+#     sudo: yes
+#     with_items:
+#       - 10periodic
+#       - 50unattended-upgrades
+#
+# ####
+#
+#   - name: Verify exchange of SSH keys
+#     debug: msg=TODO
+#    - name: generate ssh key on master node
+#      shell: >
+#        ssh-keygen -t rsa -C {{ ssh_key_sig }} -N "" -f /root/.ssh/id_rsa
+#      sudo: yes
+
+# - name: Copy ssh key to node(minion).
+#   shell: cat /root/.ssh/id_rsa.pub
+#   sudo: yes
+#   register: ssh_key_content
+
+#
+#   - name: Turn off Password Authentication
+#     lineinfile: >
+#       dest="/etc/ssh/sshd_config"
+#       regexp="^(PasswordAuthentication*)"
+#       line='PasswordAuthentication no'
+#       backrefs=yes
+#       state=present
+#       owner=root
+#       group=root
+#       mode=0644
+#       create=no
+#       backup=yes
+#     sudo: yes
+#     when: false
+#https://www.digitalocean.com/community/tutorials/how-to-protect-ssh-with-fail2ban-on-ubuntu-12-04

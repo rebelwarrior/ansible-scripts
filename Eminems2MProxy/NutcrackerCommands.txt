@@ -1,0 +1,10 @@
+$ git clone git@github.com:twitter/twemproxy.git
+$ cd twemproxy
+$ autoreconf -fvi
+$ ./configure --enable-debug=log
+$ make
+$ src/nutcracker -h
+
+$ ./configure
+$ make
+$ sudo make install

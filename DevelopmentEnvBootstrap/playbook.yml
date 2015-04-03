@@ -1,0 +1,37 @@
+---
+- hosts: all
+
+  tasks:
+  - name: Make sure the Redis config contains requirepass
+    lineinfile: >
+      dest="/etc/default/haproxy"
+      regexp="#requirepass"
+      line='requirepass {{ item }}'
+      backrefs=yes
+      insertafter='################################## SECURITY ###################################'
+      state=present
+      create=no
+      backup=yes
+    with_items:
+      - "password1"
+
+
+  - name: Boot Redis Server in Background
+    shell: "redis-server /usr/local/etc/redis.conf % > /dev/null"
+
+  - name: Raise GMP api
+     shell: ./tools/gmq go
+
+
+
+
+#1. boot redis server
+#2. Dot Env and configure redis to use authentication
+#3. redis config is in? /usr/local/etc
+#4. add requirepass + password
+#5. shell: redis-server /usr/local/etc/redis.conf & > /dev/null
+#6. dot.env
+#7. raise GMP API .gmq go
+#8. use dot. env json files on config folder
+#9. to kill GMP API .gmq stop
+#10. how to start workers without a port conflict?

@@ -1,0 +1,17 @@
+---
+- hosts: dns
+  pre_tasks:
+  - name: Update apt cache
+    apt: update_cache=yes cache_valid_time=3600
+    sudo: yes
+  tasks:
+  - name: Install bind9 （縛り？）
+    apt: >
+      pkg={{ item }} state=latest update_cache=no
+    sudo: yes
+    with_items:
+      - bind9
+      - bind9utils
+      - bind9-doc
+
+      

@@ -1,0 +1,16 @@
+---
+- hosts: all
+  pre_tasks:
+  - name: Update apt cache
+    apt: update_cache=yes cache_valid_time=3600
+    sudo: yes
+
+  - name: Install (Rbenv and Ruby) prerequesites
+    apt: >
+      pkg={{ item }} state=latest update_cache=no
+    sudo: yes
+    with_items:
+      - nginx
+      
+  - name: Ensure Nginx is running
+    service: name=nginx state=started

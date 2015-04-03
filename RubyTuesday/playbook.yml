@@ -1,0 +1,218 @@
+---
+- hosts: webapps
+  vars:
+    ruby_version: '2.1.5'
+  pre_tasks:
+  - name: Update apt cache
+    apt: update_cache=yes cache_valid_time=3600
+    sudo: yes
+  - name: Install (Rbenv and Ruby) prerequesites
+    apt: >
+      pkg={{ item }} state=latest update_cache=no
+    sudo: yes
+    with_items:
+      - git
+      - zlib1g-dev
+      - build-essential
+      - libssl-dev
+      - libreadline-dev
+      - libyaml-dev
+      - autoconf
+      - bison
+      - libreadline6-dev
+      - libncurses5-dev
+      - libcurl4-openssl-dev
+      - libxml2-dev
+      - libxslt1-dev
+      - make
+      - gcc
+
+  # - name: make sure keys for git are set
+  #   shell: >
+  #     ssh-keyscan -H github.com >> /etc/ssh/ssh_known_hosts
+  #
+  tasks:
+  - name: Get home directory
+    shell: pwd
+    register: pwd_result
+    changed_when: false
+    tags:
+      - rbenv
+
+  - name: print pwd_result
+    debug: msg={{ pwd_result.stdout }}
+    ignore_errors: yes
+
+  - name: Check if Ruby-Build is installed
+    shell: bash -lc 'ruby-build --definitions'
+    register: ruby_build_installed
+    ignore_errors: yes
+    changed_when: ruby_build_installed.rc != 0
+    tags:
+      - rbenv
+
+  - name: print ruby-build_installed return code
+    debug: msg="{{ ruby_build_installed.rc }}"
+    ignore_errors: yes
+
+  - name: Download Ruby-Build
+    git: >
+      repo=https://github.com/sstephenson/ruby-build.git
+      dest='{{ pwd_result.stdout }}/ruby-build'
+      accept_hostkey=true
+    when: ruby_build_installed.rc != 0
+    register: get_git_ruby_build
+    tags:
+      - rbenv
+      - rubybuild
+
+  - name: Ugrade Ruby-Build
+    shell: "cd {{ pwd_result.stdout}}/ruby-build && git pull"
+    when: ruby_build_installed.rc == 0
+    register: git_pull_ruby_build
+    changed_when: git_pull_ruby_build.stdout != "Already up-to-date."
+    tags:
+      - rbenv
+      - rubybuild
+
+  - name: print git_pull_ruby_build result
+    debug: msg="{{git_pull_ruby_build.stdout}}"
+    ignore_errors: yes
+    when: git_pull_ruby_build|changed
+    tags:
+      - rubybuild
+
+  - name: Install Ruby-Build standalone (initial install)
+    shell: "cd {{ pwd_result.stdout }}/ruby-build && ./install.sh"
+    sudo: yes
+    when: ruby_build_installed.rc != 0
+    tags:
+      - rbenv
+      - rubybuild
+
+  - name: Install Ruby-Build standalone (upgrade)
+    shell: "cd {{ pwd_result.stdout }}/ruby-build && ./install.sh"
+    sudo: yes
+    when: >
+      ruby_build_installed.rc == 0
+    when: >
+      git_pull_ruby_build|changed
+    tags:
+      - rbenv
+      - rubybuild
+
+  - name: Check if Rbenv is installed already
+    shell: bash -lc 'type rbenv'
+    register: rbenv_installed
+    ignore_errors: yes
+    changed_when: rbenv_installed.rc != 0
+    tags:
+      - rbenv
+
+  - name: print rbenv_installed return code
+    debug: msg="{{ rbenv_installed.rc }}"
+    ignore_errors: yes
+
+  - name: Download RbEnv
+    git: >
+      repo=https://github.com/sstephenson/rbenv.git
+      dest='{{ pwd_result.stdout }}/.rbenv'
+      accept_hostkey=true
+    when: rbenv_installed.rc != 0
+    tags:
+      - rbenv
+
+  - name: Upgrade RbEnv
+    shell: "cd {{ pwd_result.stdout }}/.rbenv && git pull"
+    when: rbenv_installed.rc == 0
+    register: git_pull_rbenv
+    changed_when: git_pull_rbenv.stdout != "Already up-to-date."
+    tags:
+      - rbenv
+
+  - name: Add rbenv Initialization to profile
+    template: >
+      src=rbenv.sh.j2
+      dest=/etc/profile.d/rbenv.sh
+      owner=root group=root mode=0755
+    sudo: true
+    tags:
+      - rbenv
+
+  - name: Run type rbenv
+    shell: bash -lc 'type rbenv'
+    register: type_rbenv_result
+    ignore_errors: yes
+    changed_when: type_rbenv_result.rc != 0
+    tags:
+      - rbenv
+
+  - name: print 'type rbenv' result
+    debug: msg="{{ type_rbenv_result.stdout }}"
+    ignore_errors: yes
+
+  - name: Assert rbenv is a function
+    assert:
+      that:
+        - "'rbenv is a function' in type_rbenv_result.stdout"
+
+  - name: Check ruby {{ ruby_version }} installed
+    shell: bash -lc "rbenv versions | grep {{ ruby_version }}"
+    register: ruby_installed
+    changed_when: false
+    ignore_errors: yes
+    tags:
+      - rbenv
+
+  - name: Verify that ruby version is available
+    shell: bash -lc "ruby-build --definitions"
+    register: ruby_definitions
+    changed_when: false
+    ignore_errors: yes
+    tags:
+      - rbenv
+      - rubybuild
+
+  - name: Assert that ruby version is available
+    assert:
+      that:
+        - ruby_definitions.stdout.find('{{ ruby_version }}') != -1
+    tags:
+      - rbenv
+    # ignore_errors: yes
+
+  - name: Install ruby {{ ruby_version }}
+    shell: bash -lc "rbenv install {{ ruby_version }}"
+    when: ruby_installed.rc != 0
+    tags:
+      - rbenv
+
+  - name: Install ruby {{ ruby_version }}
+    shell: bash -lc "rbenv global {{ ruby_version }} && rbenv rehash"
+    when: ruby_installed.rc != 0
+    tags:
+      - rbenv
+
+  - name: Verify Ruby Version
+    shell: bash -lc "ruby -v"
+    register: ruby_version_check
+    ignore_errors: yes
+    changed_when: ruby_version_check.rc != 0
+    tags:
+      - rbenv
+
+  - name: print Ruby Version
+    debug: msg="{{ ruby_version_check }}"
+    ignore_errors: yes
+    tags:
+      - rbenv
+
+  - name: Assert Ruby Version
+    assert:
+      that: ruby_version_check.stdout.find('{{ ruby_version }}') != -1
+    ignore_errors: no
+    tags:
+      - rbenv
+
+  - name: Install bundler
+    gem: name=bundler state=latest

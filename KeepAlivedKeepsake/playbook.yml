@@ -1,0 +1,27 @@
+---
+- hosts: keepalived
+  pre_tasks:
+  - name: Update apt cache
+    apt: update_cache=yes cache_valid_time=3600
+    sudo: yes
+  tasks:
+  - name: Install keepalived
+    apt: >
+      pkg={{ item }} state=latest update_cache=no
+    sudo: yes
+    with_items:
+      - keepalived
+  - name: Copy Keepalived.conf file (untested)
+    copy:
+      src: "{{ item.src }}"
+      dest: "{{ item.dest }}"
+      owner: root
+      group: root
+      mode: 644
+    sudo: yes
+    with_items:
+      {
+        src: "keepalived.conf.j2"
+        dest: "/etc/keepalived/keepalived.conf"
+      }
+    when: false

@@ -1,0 +1,45 @@
+---
+- hosts: webapps
+  pre_tasks:
+  - name: Update apt cache
+    apt: update_cache=yes cache_valid_time=3600
+    sudo: yes
+  - name: Remove incompatile old pkg named 'node' if present
+    apt: pkg=node state=absent update_cache=no
+
+  tasks:
+  - name: Install Nodejs
+    apt: >
+      pkg={{ item }} state=latest update_cache=no
+    sudo: yes
+    with_items:
+      - nodejs
+      - nodejs-legacy
+      - npm
+
+  - name: Verify nodejs installed in the right place
+    shell: node -v
+    register: node_version_check
+    ignore_errors: yes
+    changed_when: false
+
+  - name: Assert nodejs installed
+    assert:
+      that: node_version_check.rc == 0
+
+  - name: print node version
+    debug: "msg={{ node_version_check.stdout }}"
+
+  - name: Install Coffee-Script (to test)
+    npm: name=coffee-script global=yes state=present
+    sudo: yes
+
+  - name: Verify Coffee-Script install
+    shell: "coffee -v"
+    register: coffee_script_version_check
+    ignore_errors: yes
+    changed_when: false
+
+  - name: Assert Coffe-Script install
+    assert:
+      that: coffee_script_version_check.stdout.find("CoffeeScript version") != -1

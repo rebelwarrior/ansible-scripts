@@ -1,0 +1,49 @@
+---
+- hosts: loadbalancers
+  pre_tasks:
+  - name: Update apt cache
+    apt: update_cache=yes cache_valid_time=3600
+    sudo: yes
+
+  handlers:
+  - name: Restart pound server
+    service: name=pound state=restarted
+    sudo: yes
+    ignore_errors: yes
+
+  tasks:
+  - name: Install Pound
+    apt: "pkg={{ item }} state=latest update_cache=no"
+    sudo: yes
+    with_items:
+      - pound
+
+  - name: Enable pound by default
+    lineinfile: >
+      dest="/etc/default/pound"
+      regexp="^(startup=0)"
+      line='startup=1'
+      backrefs=yes
+      state=present
+      owner=root
+      group=root
+      mode=0644
+      create=no
+      backup=yes
+    sudo: yes
+
+  - name: Verify /etc/default/pound
+    shell: cat /etc/default/pound
+    register: cat_result1
+    ignore_errors: yes
+    changed_when: false
+
+  - name: print cat result
+    debug: msg="{{ cat_result1.stdout_lines }}"
+    ignore_errors: yes
+    when: cat_result1|success
+
+  - name: Start pound server
+    service: name=pound state=restarted
+    sudo: yes
+    ignore_errors: yes  

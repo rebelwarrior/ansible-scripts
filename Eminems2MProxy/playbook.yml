@@ -1,0 +1,98 @@
+---
+- hosts: all
+  pre_tasks:
+  - name: Update apt cache
+    apt: update_cache=yes cache_valid_time=3600
+    sudo: yes
+
+  - name: Install Twemproxy (nutcracker) prerequesites
+    apt: >
+      pkg={{ item }} state=latest update_cache=no
+    sudo: yes
+    with_items:
+      - gcc
+      - make
+      - libc6
+      - git
+      - git-core
+      - autoconf
+      - libtool
+
+  tasks:
+  - name: Get pwd result
+    shell: pwd
+    register: pwd_result
+    ignore_errors: yes
+    changed_when: pwd_result.rc != 0
+
+  - name: Check if Twemproxy's git repository exists
+    shell: cd {{ pwd_result.stdout }}/.twemproxy && git status
+    register: git_repo_existance
+    changed_when: false
+    ignore_errors: yes
+
+  - name: Download Twemproxy(nutcracker)
+    git: >
+      repo=https://github.com/twitter/twemproxy.git
+      dest='{{ pwd_result.stdout }}/.twemproxy'
+      accept_hostkey=true
+    register: get_git_twemproxy
+    when: git_repo_existance.rc != 0
+
+  - name: Update Twenproxy(nutcracker)
+    shell: cd {{ pwd_result.stdout }}/.twemproxy && git pull
+    register: git_pull_twemproxy
+    when: get_git_twemproxy|skipped
+    changed_when: git_pull_twemproxy.stdout != "Already up-to-date."
+
+  # - name: Assure 'AC_PROG_LIBTOOL' at end of configure.ac
+  #   lineinfile: >
+  #     dest={{ pwd_result.stdout }}/.twemproxy/configure.ac
+  #     line=AC_PROG_LIBTOOL
+  #     state=present
+  #     insertafter=EOF
+
+  - name: Prep twemproxy w/ autoconfig (autoreconf)
+    shell: >
+      cd {{ pwd_result.stdout }}/.twemproxy && autoreconf -fvi
+    when: >
+      get_git_twemproxy|changed
+
+  - name: Make twemproxy
+    shell: >
+      cd {{ pwd_result.stdout }}/.twemproxy && ./configure && make
+    when: >
+      get_git_twemproxy|changed
+
+  - name: Make Install Twenproxy(nutcracker)
+    shell: "cd {{ pwd_result.stdout }}/.twemproxy && make install"
+    sudo: yes
+    when: >
+      get_git_twemproxy|changed
+
+  - name: Prep twemproxy w/ autoconfig (autoreconf) (update)
+    shell: >
+      cd {{ pwd_result.stdout }}/.twemproxy && autoreconf -fvi
+    when: >
+      git_pull_twemproxy|changed
+
+  - name: Make twemproxy (update)
+    shell: >
+      cd {{ pwd_result.stdout }}/.twemproxy && ./configure && make
+    when: >
+      git_pull_twemproxy|changed
+
+  - name: Make Install Twenproxy(nutcracker) (update)
+    shell: "cd {{ pwd_result.stdout }}/.twemproxy && make install"
+    sudo: yes
+    when: >
+      git_pull_twemproxy|changed
+
+  - name: Verify Twemproxy successfully installed
+    shell: nutcracker -V
+    register: nutcracker_install
+    changed_when: nutcracker_install.rc != 0
+
+  - name: Assert Twemproxy installed
+    assert:
+      that: nutcracker_install.stdout.find('This is nutcarcker')

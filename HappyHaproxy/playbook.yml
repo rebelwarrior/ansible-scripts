@@ -1,0 +1,59 @@
+---
+- hosts: haproxy
+  var_files:
+    - haproxy_vars
+
+  pre_tasks:
+  - name: Update apt cache
+    apt: update_cache=yes cache_valid_time=3600
+    sudo: yes
+
+  handlers:
+  - name: Restart haproxy server
+    service: name=haproxy state=restarted
+    sudo: yes
+    ignore_errors: yes
+
+  - name: Reload haproxy
+    service: name=haproxy state=reloaded
+    sudo: yes
+    when: false
+
+  tasks:
+  - name: Install Haproxy
+    apt: >
+      pkg={{ item }} state=latest update_cache=no
+    sudo: yes
+    with_items:
+      - haproxy
+
+  - name: Enable haproxy by default
+    lineinfile: >
+      dest="/etc/default/haproxy"
+      regexp="^(ENABLED=0)"
+      line='ENABLED=1'
+      backrefs=yes
+      insertbefore='# Add extra flags here.'
+      state=present
+      owner=root
+      group=root
+      mode=0644
+      create=no
+      backup=yes
+    sudo: yes
+
+  - name: Verify /etc/default/haproxy
+    shell: cat /etc/default/haproxy
+    register: cat_result
+    ignore_errors: yes
+    changed_when: false
+
+  - name: print cat result
+    debug: msg="{{ cat_result.stdout_lines }}"
+    ignore_errors: yes
+    when: cat_result|success
+
+  - name: Set up haproxy config files
+    template: src=haproxy.cfg.j2 dest=/etc/haproxy/haproxy.cfg
+    notify: Restart haproxy server
+    # with_vars: haproxy_vars

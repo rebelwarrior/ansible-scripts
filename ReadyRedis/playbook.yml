@@ -1,0 +1,114 @@
+---
+- hosts: redis
+
+  pre_tasks:
+  - name: Update apt cache
+    apt: update_cache=yes cache_valid_time=3600
+    sudo: yes
+
+  - name: Install gcc and libc (make etc.)
+    apt: "pkg={{ item }} state=latest update_cache=no"
+    sudo: yes
+    with_items:
+      - gcc
+      - make
+      - libc6
+
+  - name: Install wget
+    apt: "pkg={{ item }} state=latest update_cache=yes"
+    sudo: yes
+    with_items:
+      - wget
+
+
+  tasks:
+  - name: Download Redis
+    shell: >
+      wget http://download.redis.io/redis-stable.tar.gz
+
+  - name: Untar Redis
+    shell: >
+      tar xvzf redis-stable.tar.gz
+
+  - name: cd and make Redis
+    shell: >
+      cd redis-stable
+      make
+
+  - name: store working dir for Redis
+    shell: >
+      cd redis-stable && pwd
+    register: pwd_result
+
+  - name: print current working dir
+    debug: msg={{ pwd_result.stdout }}
+    ignore_errors: yes
+
+  - name: make install Redis
+    shell: "cd {{ item }} && make install"
+    sudo: yes
+    with_items:
+      - "{{ pwd_result.stdout }}"
+
+  - name: Start Redis Server
+    shell: 'redis-server &'
+    register: server_output
+    changed_when: server_output.rc != 0
+
+  - name: Verify Redis installation ping
+    command: 'redis-cli ping'
+    register: cmd_result
+    changed_when: cmd_result.rc != 0
+    ignore_errors: yes
+
+  - name: Assert Redis installation ping
+    assert:
+      that: "'PONG' in cmd_result.stdout"
+
+  - name: Kill Redis Server
+    shell: 'killall redis-server'
+    register: killallcmd
+    changed_when: killallcmd.rc != 0
+
+  #Create conditional not to mkdirs if they exist already
+  - name: Create directories for configs
+    command: "mkdir {{ item }}"
+    sudo: yes
+    with_items:
+      - /var/redis
+      - /etc/redis
+      - /etc/redis/{{ 6379 }}
+    ignore_errors: yes
+
+  - name: Set up Redis config files
+    template: src=redis.conf.j2 dest=/etc/redis/redis.conf
+
+  - name: Set up Redis init script
+    debug: msg='TODO'  
+
+  - name: Copy initial configuration files
+    shell: "cp {{ item.src }} {{ item.dest }}"
+    sudo: yes
+    with_items:
+      - {
+        src: "{{ pwd_result.stdout }}/utils/redis_init_script",
+        dest: "/etc/init.d/redis_{{ 6379 }}"
+      }
+      # - {
+      #   src: "{{ pwd_result.stdout }}/redis.conf",
+      #   dest: "/etc/redis/{{ 6379 }}.conf"
+      # }
+
+
+  # - name: Copy initial configuration files
+  #   copy:
+  #     src: "{{ item.src }}" #THIS IS A LOCAL FOLDER!! omg
+  #     dest: "{{ item.dest }}"
+  #     owner: root
+  #     group: root
+  #     mode: 644
+  #   with_items:
+  #   - {
+  #     src: "{{ pwd_result.stdout }}/utils/redis_init_script "
+  #     dest: "/etc/init.d/redis_{{ 6379 }}"
+  #   }
