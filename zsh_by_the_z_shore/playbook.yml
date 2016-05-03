@@ -1,0 +1,56 @@
+---
+- hosts: all
+
+  pre_tasks:
+  - name: Update apt cache
+    apt: update_cache=yes cache_valid_time=3600
+    become: yes
+
+  - name: Install oh-my-zsh prerequesites (git)
+    apt: >
+      pkg={{ item }} state=latest update_cache=no
+    become: yes
+    with_items:
+      - git
+
+  tasks:
+  - name: Install zsh
+    apt: >
+      pkg={{ item }} state=latest update_cache=no
+    become: yes
+    with_items:
+      - zsh
+
+  - name: Get home directory
+    shell: pwd
+    register: pwd_result
+    changed_when: false
+
+  - name: Check if OhMyZsh is installed
+    shell: 'ls {{ pwd_result.stdout }}/.oh-my-zsh'
+    register: ohmyzsh_installed
+    ignore_errors: yes
+
+  - name: Git clone Oh My Zsh
+    git: >
+      repo=https://github.com/robbyrussell/oh-my-zsh.git
+      dest='{{ pwd_result.stdout }}/.oh-my-zsh'
+      accept_hostkey=true
+    when: ohmyzsh_installed.rc != 0
+    register: get_git_ohmyzsh
+
+  - name: Check if OhMyZsh is installed
+    shell: 'ls {{ pwd_result.stdout }}/.oh-my-zsh'
+    register: zshrc_present
+    ignore_errors: yes
+
+  - name: Copy oh my zsh template
+    template: >
+      src=zshrc.j2
+      dest={{ pwd_result.stdout }}/.zshrc
+      owner=root group=root mode=0777
+    when: zshrc_present.rc != 0
+
+  - name: Change default zsh
+    shell: chsh -s /bin/zsh
+    become: yes

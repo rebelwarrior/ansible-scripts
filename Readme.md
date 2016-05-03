@@ -1,8 +1,8 @@
-# DevOps 
+# DevOps
 
 tested on vagrant so vagrant file included
 
-All asume an Ubuntu 14.04 box
+All assume an Ubuntu 14.04 box though I may change that to a 16.04.
 
 
-20% cooler than normal ansible scripts
+__20% cooler__ than normal ansible scripts

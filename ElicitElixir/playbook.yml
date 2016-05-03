@@ -1,0 +1,43 @@
+---
+- hosts: all
+  pre_tasks:
+  - name: mkdir
+    file: path=/opt/erlang-solutions/ state=directory
+    become: yes
+    register: mkdir_opt
+
+  - name: download erlang deb
+    become: yes
+    get_url: >
+      url=https://packages.erlang-solutions.com/erlang-solutions_1.0_all.deb
+      dest=/opt/erlang-solutions/
+      mode=0777
+    register: download_erlang_deb
+
+
+  tasks:
+  - name: Install Erlang Solutions deb
+    shell: dpkg -i /opt/erlang-solutions/erlang-solutions_1.0_all.deb
+    become: yes
+    register: install_erlang_solutions_deb
+
+  - name: Update apt cache
+    apt: update_cache=yes
+    become: yes
+    register: update_apt_cache
+
+  - name: Install Elixir packages
+    apt: >
+      pkg={{ item }} state=latest update_cache=no
+    become: yes
+    with_items:
+      - esl-erlang
+      - elixir
+
+  - name: Install Extra packages
+    apt: >
+      pkg={{ item }} state=latest update_cache=no
+    become: yes
+    with_items:
+      - nodejs-legacy
+      - inotify-tools

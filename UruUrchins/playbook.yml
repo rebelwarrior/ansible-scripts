@@ -1,0 +1,228 @@
+---
+- hosts: all
+  vars:
+    ruby_versions: ['2.1.5', '2.2.1', '2.3.0-dev', '2.5.55']
+    ruby_version: '2.1.5'
+    ruby_version_patch: 'p273'
+
+  pre_tasks:
+  - name: Update apt cache
+    apt: update_cache=yes cache_valid_time=3600
+    sudo: yes
+  - name: Install (Ruby-Build and Ruby) prerequesites
+    apt: >
+      pkg={{ item }} state=latest update_cache=no
+    sudo: yes
+    with_items:
+      - git
+      - zlib1g-dev
+      - build-essential
+      - libssl-dev
+      - libreadline-dev
+      - libyaml-dev
+      - autoconf
+      - bison
+      - libreadline6-dev
+      - libncurses5-dev
+      - libcurl4-openssl-dev
+      - libxml2-dev
+      - libxslt1-dev
+      - make
+      - gcc
+      - libffi-dev
+
+  - name: Install Uru prerequesites (Go lang)
+    apt: >
+      pkg={{ item }} state=latest update_cache=no
+    sudo: yes
+    with_items:
+      - golang
+
+
+  tasks:
+  - name: Get home directory
+    shell: pwd
+    register: pwd_result
+    changed_when: false
+    tags:
+      - uru-ruby
+
+  - name: print pwd_result
+    debug: msg={{ pwd_result.stdout }}
+    ignore_errors: yes
+
+  - name: Check if Ruby-Build is installed
+    shell: bash -lc 'ruby-build --definitions'
+    register: ruby_build_installed
+    ignore_errors: yes
+    changed_when: ruby_build_installed.rc != 0
+    tags:
+      - uru-ruby
+
+  - name: print ruby-build_installed return code
+    debug: msg="{{ ruby_build_installed.rc }}"
+    ignore_errors: yes
+    changed_when: false
+
+  - name: Download Ruby-Build
+    git: >
+      repo=https://github.com/sstephenson/ruby-build.git
+      dest='{{ pwd_result.stdout }}/ruby-build'
+      accept_hostkey=true
+    when: ruby_build_installed.rc != 0
+    register: get_git_ruby_build
+    tags:
+      - uru-ruby
+
+  - name: Ugrade Ruby-Build
+    shell: "cd {{ pwd_result.stdout}}/ruby-build && git pull"
+    when: ruby_build_installed.rc == 0
+    register: git_pull_ruby_build
+    changed_when: git_pull_ruby_build.stdout != "Already up-to-date."
+    tags:
+      - uru-ruby
+
+  - name: print git_pull_ruby_build result
+    debug: msg="{{git_pull_ruby_build.stdout}}"
+    ignore_errors: yes
+    when: git_pull_ruby_build|changed
+    changed_when: git_pull_ruby_build.stdout != "Already up-to-date."
+
+  - name: Install Ruby-Build standalone (initial install)
+    shell: "cd {{ pwd_result.stdout }}/ruby-build && ./install.sh"
+    sudo: yes
+    when: ruby_build_installed.rc != 0
+    tags:
+      - uru-ruby
+
+  - name: Install Ruby-Build standalone (upgrade)
+    shell: "cd {{ pwd_result.stdout }}/ruby-build && ./install.sh"
+    sudo: yes
+    when: >
+      ruby_build_installed.rc == 0
+    when: >
+      git_pull_ruby_build|changed
+    tags:
+      - uru-ruby
+
+  - name: List all rubies in /opt/
+    shell: ls /opt/
+    register: opt_ls_result
+    changed_when: opt_ls_result.rc != 0
+
+  - name: print content of /opt directory
+    debug: msg="{{ opt_ls_result.stdout }}"
+    ignore_errors: yes
+    changed_when: false
+
+  - name: Install Ruby from Ruby-Build standalone
+    shell: "ruby-build {{ item }} /opt/ruby-{{ item }}/"
+    sudo: yes
+    when: opt_ls_result.stdout.find("{{ item }}") == -1 and ruby_build_installed.stdout.find("{{ item }}") != -1
+    with_flattened:
+      - ruby_versions
+
+  - name: Check if URU is installed
+    shell: "ls /usr/local/bin/uru_rt"
+    register: uru_ls_result
+    ignore_errors: yes
+    changed_when: uru_ls_result.rc != 0
+
+  - name: print uru_ls_result
+    debug: msg="{{ uru_ls_result.rc }}"
+    changed_when: false
+    ignore_errors: yes
+
+  - name: Check URU version
+    shell: "uru version"
+    register: uru_version_result
+    when: uru_ls_result.rc == 0
+    ignore_errors: yes
+
+  - name: Whoami
+    shell: "whoami"
+    register: whoami_result
+
+  - name: print whoami result
+    debug: msg="{{ whoami_result.stdout }}"
+    changed_when: whoami_result.rc != 0
+
+  # - name: Add GOROOT line to .bashrc
+  #   lineinfile: >
+  #     dest='/home/{{ item }}/.bashrc'
+  #     line="export GOROOT=/usr/lib/go"
+  #     state=present
+  #     owner={{ item }}
+  #     group={{ item }}
+  #     mode=0777
+  #     create=yes
+  #   with_items:
+  #     - "{{ whoami_result.stdout }}"
+  #
+  # - name: Add GOPATH line to .bashrc
+  #   lineinfile: >
+  #     dest='/home/{{ item }}/.bashrc'
+  #     line="export GOPATH={{ pwd_result.stdout }}/go"
+  #     state=present
+  #     owner={{ item }}
+  #     group={{ item }}
+  #     mode=0777
+  #     create=yes
+  #   with_items:
+  #     - "{{ whoami_result.stdout }}"
+
+  - name: Build uru from go source
+    shell: "export GOPATH={{ pwd_result.stdout }}/go && go get -ldflags '-s' bitbucket.org/jonforums/uru"
+
+  - name: Rename compiled uru to uru_rt
+    shell: "cd {{ pwd_result.stdout }}/go/bin && mv uru uru_rt"
+
+  - name: Move and rename URU
+    shell: "cd {{ pwd_result.stdout }}/go/bin && cp uru_rt /usr/local/bin/"
+    sudo: yes
+
+  - name: Change mod of URU
+    shell: "chmod +x /usr/local/bin/uru_rt"
+    sudo: yes
+
+  - name: Add line for eval uru_rt for current user
+    lineinfile: >
+      dest='/home/{{ item }}/.profile'
+      line='eval "$(uru_rt admin install)"'
+      state=present
+      owner={{ item }}
+      group={{ item }}
+      mode=0777
+      create=yes
+    with_items:
+      - "{{ whoami_result.stdout }}"
+
+  - name: Add all rubies to URU
+    shell: '/usr/local/bin/uru_rt admin add --recurse /opt/'
+
+  - name: Add auto ruby for current user
+    lineinfile: >
+      dest='/home/{{ item }}/.ruby-version'
+      line="{{ ruby_versions[0] }}-{{ruby_version_patch }}"
+      state=present
+      owner={{ item }}
+      group={{ item }}
+      mode=0777
+      create=yes
+    with_items:
+      - "{{ whoami_result.stdout }}"
+
+  - name: Verify Ruby Version
+    shell: bash -lc "uru auto && ruby -v"
+    register: ruby_version
+    ignore_errors: yes
+    changed_when: ruby_version.rc != 0
+
+  - name: print Ruby Version
+    debug: msg="{{ ruby_version }}"
+    ignore_errors: yes
+    changed_when: ruby_version.rc != 0
+
+  - name: Assert Ruby Version
+    assert:
+      that: ruby_version.stdout.find('{{ ruby_versions[0] }}') != -1
