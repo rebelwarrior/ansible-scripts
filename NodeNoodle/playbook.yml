@@ -3,7 +3,7 @@
   pre_tasks:
   - name: Update apt cache
     apt: update_cache=yes cache_valid_time=3600
-    sudo: yes
+    become: yes
   - name: Remove incompatile old pkg named 'node' if present
     apt: pkg=node state=absent update_cache=no
 
@@ -11,7 +11,7 @@
   - name: Install Nodejs
     apt: >
       pkg={{ item }} state=latest update_cache=no
-    sudo: yes
+    become: yes
     with_items:
       - nodejs
       - nodejs-legacy
@@ -32,7 +32,7 @@
 
   - name: Install Coffee-Script (to test)
     npm: name=coffee-script global=yes state=present
-    sudo: yes
+    become: yes
 
   - name: Verify Coffee-Script install
     shell: "coffee -v"
@@ -43,3 +43,20 @@
   - name: Assert Coffe-Script install
     assert:
       that: coffee_script_version_check.stdout.find("CoffeeScript version") != -1
+
+  - name: print node version
+    debug: "msg={{ node_version_check.stdout }}"
+
+  - name: Install Elm-lang (to test)
+    npm: name=elm global=yes state=present
+    become: yes
+
+  - name: Verify Elm-lang install
+    shell: "elm-make -h"
+    register: coffee_script_version_check
+    ignore_errors: yes
+    changed_when: false
+
+  - name: Assert Elm-lang install
+    assert:
+      that: coffee_script_version_check.stdout.find("Elm Platform") != -1

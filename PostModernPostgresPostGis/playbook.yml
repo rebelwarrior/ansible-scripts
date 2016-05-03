@@ -1,0 +1,14 @@
+---
+- hosts: all
+  pre_tasks:
+  - name: Update apt cache
+    apt: update_cache=yes cache_valid_time=3600
+    become: yes
+
+  tasks:
+  - name: Install PostgresQL and PostGIS
+    apt: >
+      pkg={{ item }} state=latest update_cache=no
+    become: yes
+    with_items:
+      - postgresql
