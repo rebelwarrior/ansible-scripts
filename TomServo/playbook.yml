@@ -1,24 +1,37 @@
 ---
+vars:
+  tomcat_ver: 'tomcat8'
+  user_name: 'geodatum'
+  password: '123456789'
 pre_tasks:
 - name: Update apt cache
-  apt: update_cache=yes cache_valid_time=3600  
-  
-tasks:
-- name: Install OpenJDK 8
-  apt: "pkg={{ item }} state=latest update_cache=yes"
-  with_items:
-    - openjdk-8-jdk
-    
-- name: Set OpenJDK as stable
-  command: update-java-alternatives --set {{ item }}
-  with_items:
-    - openjdk-8-jdk
+  apt: update_cache=yes cache_valid_time=3600
 
-- name: Install Tomcat 8 (TomServo)
+tasks:
+# - name: Install OpenJDK 8
+#   apt: "pkg={{ item }} state=latest update_cache=yes"
+#   with_items:
+#     - openjdk-8-jdk
+#
+# - name: Set OpenJDK as stable
+#   command: update-java-alternatives --set {{ item }}
+#   with_items:
+#     - openjdk-8-jdk
+
+- name: "Install {{tomcat_ver}} (TomServo)"
   apt: "pkg={{ item }} state=installed"
   with_items:
-    - tomcat8
-    - tomcat8-admin
-    
-- name: Ensure Tomcat 8 is started and enabled on boot
-  service: name=tomcat8 state=started enabled=yes
+    - "{{tomcat_ver}}"
+    - "{{tomcat_ver}}-admin"
+
+- name: "Ensure {{tomcat_ver}} is started and enabled on boot"
+  service: name="{{tomcat_ver}}" state=started enabled=yes
+
+- name: "Create Users xml"
+  template: >
+    src=tomcat-users.xml.j2
+    dest="/etc/{{tomcat_ver}}/tomcat-users.xml"
+    owner=root
+    group="{{tomcat_ver}}"
+    mode=0640
+  become: yes

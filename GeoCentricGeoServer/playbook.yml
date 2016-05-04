@@ -1,0 +1,74 @@
+---
+- hosts: all
+  vars:
+    tomcat_ver: 'tomcat7'
+    geoserver_link: 'http://sourceforge.net/projects/geoserver/files/GeoServer/2.9-RC1/geoserver-2.9-RC1-war.zip'
+  pre_tasks:
+  - name: Update apt cache
+    apt: update_cache=yes cache_valid_time=3600
+    become: yes
+  - name: Install prerequesites
+    apt: "pkg={{ item }} state=installed"
+    with_items:
+      - unzip
+    become: yes
+
+
+  tasks:
+  - name: "Install {{tomcat_ver}}"
+    apt: "pkg={{ item }} state=installed"
+    with_items:
+      - "{{tomcat_ver}}"
+      - "{{tomcat_ver}}-admin"
+    become: yes
+
+  - name: "Ensure {{tomcat_ver}} is started and enabled on boot"
+    service: >
+      name={{tomcat_ver}} state=started enabled=yes
+    become: yes
+
+  - name: Make Dir
+    file: >
+      state=directory
+      path=/opt/geoserver/
+      mode=0777
+    become: yes
+
+  - name: Verify Geoserver zip file has not been downloaded
+    shell: ls /opt/geoserver/geoserver*.zip
+    register: geoserver_downloaded
+    ignore_errors: yes
+
+  - name: Get Geoserver war
+    get_url: >
+      url={{geoserver_link}}
+      dest=/opt/geoserver
+    when: geoserver_downloaded.rc != 0
+
+  - name: Get name of zip file
+    shell: ls /opt/geoserver/geoserver*.zip
+    register: name_of_zip_file
+
+  - name: Verify Geoserver war file has not been unzipped
+    shell: ls /opt/geoserver/geoserver*.war
+    register: geoserver_unzipped
+    ignore_errors: yes
+
+  - name: Unzip war
+    unarchive: >
+      src={{ name_of_zip_file.stdout }}
+      dest=/opt/geoserver/
+      list_files=yes
+      copy=no
+    when: geoserver_unzipped.rc != 0
+
+  - name: Verify Geoserver war file has not been moved
+    shell: ls /opt/geoserver/geoserver*.war
+    register: geoserver_war
+    ignore_errors: yes
+
+  - name: Move war file
+    shell: >
+      "mv /opt/geoserver/geoserver.war /var/lib/{{tomcat_ver}}/webapps/geoserver.war"
+    become: yes
+    when: geoserver_war.rc == 0
