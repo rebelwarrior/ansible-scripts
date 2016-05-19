@@ -14,6 +14,7 @@
       - postgresql
       - postgresql-contrib
       - postgis
+      - pgtop
 
   - name: Install PgAdmin3
     apt: >
@@ -21,3 +22,22 @@
     become: yes
     with_items:
       - pgadmin3
+
+  - name: Register PostgresQL as a service.
+    service: >
+      name=postgresql
+      state=started
+
+  - name: Create .pgpass file.
+    template: >
+      src=pgpass.j2
+      destination=/root/.pgpass
+      group=postgres
+      mode=0600
+      owner=root
+
+  - name: Alter /etc/postgres/<<version>>/main/postgres.config
+  # To listen on on '*' instead of localhost    
+
+
+# pgpass:  hostname:port:database:username:password

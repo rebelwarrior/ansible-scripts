@@ -1,7 +1,7 @@
 ---
 - hosts: all
   vars:
-    tomcat_ver: 'tomcat7'
+    tomcat_ver: 'tomcat8'
     geoserver_link: 'http://sourceforge.net/projects/geoserver/files/GeoServer/2.9-RC1/geoserver-2.9-RC1-war.zip'
   pre_tasks:
   - name: Update apt cache
