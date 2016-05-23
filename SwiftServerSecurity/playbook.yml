@@ -3,11 +3,18 @@
   pre_tasks:
   - name: Update apt cache
     apt: update_cache=yes cache_valid_time=3600
-    sudo: yes
+    become: yes
 
   - name: quote InfoSec Taylor Swift:
     debug: >
       msg="There is no love without vulnerability. That's why it's not allowed on our network."
+      
+  # Remove NetStat
+  - name: Remove NetStat
+    apt: >
+      name=netstat
+      state=absent
+    become: yes 
 
   tasks:
   - name: Turn off Remote Root Login
@@ -22,19 +29,19 @@
       mode=0644
       create=no
       backup=yes
-    sudo: yes
+    become: yes
 
   - name: Install ufw (Uncomplicated Firewall)
     apt: >
       pkg={{ item }} state=present update_cache=no
-    sudo: yes
+    become: yes
     with_items:
       - ufw
 
   - name: Register Firewall Status
     shell: ufw status
     register: ufw_status
-    sudo: yes
+    become: yes
     changed_when: false
     # Status: inactive
 
@@ -43,7 +50,7 @@
     with_items:
       - '22'
       - '2222'
-    sudo: yes
+    become: yes
 
   # Skipping adding existing rule
   # Rules updated\nRules updated
@@ -51,15 +58,15 @@
   - name: Close all other ports
     shell: ufw default deny
     register: closing_all_ports
-    sudo: yes
+    become: yes
 
   - name: Create exception for IP for local network txt
     shell: ufw allow from 127.0.0.1 to any
-    sudo: yes
+    become: yes
 
   - name: Enable Firewall (ufw)
     ufw: state=enabled
-    sudo: yes
+    become: yes
 
   # - name: Assert ports are close by default
   #   assert:
@@ -67,7 +74,7 @@
 
   - name: Create exception for IP for local network txt
     shell: ufw allow from 127.0.0.1 to any
-    sudo: yes
+    become: yes
     when: false
 
   - name: Create exception for IP for local network for mysql port (3306)
@@ -95,24 +102,24 @@
   - name: Install {{ item }}
     apt: >
       pkg={{ item }} state=present update_cache=no
-    sudo: yes
+    become: yes
     with_items:
       - fail2ban
 
   - name: Copy Default config for Fail2Ban
     shell: cp /etc/fail2ban/jail.conf /etc/fail2ban/jail.local
-    sudo: yes
+    become: yes
 
   - name: Start Fail2ban server via client
     shell: fail2ban-client start
-    sudo: yes
+    become: yes
     ignore_errors: yes
 
 ###
 
 #   - name: Install Unattended upgrades
 #     apt: >
-#       pkg={{ item }} state=installed update_cache=no
+#       name={{ item }} state=installed update_cache=no
 #     sudo: yes
 #     with_items:
 #       - unattennded-upgrades

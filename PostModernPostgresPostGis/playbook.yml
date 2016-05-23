@@ -2,7 +2,7 @@
 - hosts: all
   pre_tasks:
   - name: Update apt cache
-    apt: update_cache=yes cache_valid_time=3600
+    apt:  update_cache=yes cache_valid_time=3600
     become: yes
 
   tasks:
@@ -35,9 +35,19 @@
       group=postgres
       mode=0600
       owner=root
+      
+  - name: Get Postgres Version 
+    shell: ls /etc/postgres/
+    register: pg_versions
 
   - name: Alter /etc/postgres/<<version>>/main/postgres.config
-  # To listen on on '*' instead of localhost    
+    lineinfile: >
+      dest=/etc/postgres/{{ item }}/main/postgres.config
+      insertafter="^\# CONNECTIONS AND AUTHENTICATION"
+      line="#listen_addresses = '*'			# what IP address(es) to listen on;"
+      regexp="^\#listen_addresses = 'localhost'"
+    with_items: pg_versions.stdout_lines
+       
 
 
 # pgpass:  hostname:port:database:username:password
